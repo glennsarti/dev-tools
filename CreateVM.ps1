@@ -1,4 +1,4 @@
-Param($Template = 'Server2012R2', $VMName = '')
+Param($Template = '', $VMName = '')
 $ErrorActionPreference = 'Stop'
 
 $DiskRoot = 'C:\HyperV\Disks'
@@ -14,15 +14,27 @@ $Templates = @{
   }
 }
 
-# TODO
-# Prompt for template and VM Name
+# Get VM Name if not supplied
+while ($VMName -eq '') {
+  $VMName = Read-Host -Prompt "Enter VM Name"
+}
+
+# Get Template Name if not supplied
+while (-not ($Templates.ContainsKey($Template))) {
+  Write-Host "Templates:"
+  $Templates.GetEnumerator() | % {
+    Write-Host " - $($_.Key)"
+  }
+
+  $Template = Read-Host -Prompt "Enter Template Name"
+}
 
 $VMTemplate = $Templates."$Template" #"
 $VMDiskName = Join-Path -Path $DiskRoot -ChildPath "$($VMName).$($VMTemplate.DiskType)"
 $RootVMDisk = Join-Path -Path $DiskRoot -ChildPath "$($VMTemplate.ParentDisk)"
 
 # Cleanup
-Remove-VM -Name $VMName -Confirm:$false -Force | out-Null
+Get-VM -Name $VMName -ErrorAction 'SilentlyContinue' | Remove-VM -Name $VMName -Confirm:$false -Force | out-Null
 If (Test-Path -Path $VMDiskName) { Remove-Item -Path $VMDiskName -Confirm:$false -Force | Out-Null }
 
 # Create the VM
