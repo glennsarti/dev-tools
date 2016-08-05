@@ -1,0 +1,12 @@
+gem 'fuubar'
+
+if RUBY_VERSION == "1.8.7"
+  gem 'debugger'
+elsif RUBY_VERSION =~ /^2\./
+  gem "pry-byebug"
+else
+  gem "pry-debugger"
+#  gem 'ruby-debug'
+end
+
+gem "pry-stack_explorer"
