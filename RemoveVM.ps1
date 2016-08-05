@@ -1,4 +1,4 @@
-Param($VMName = 'nictest')
+Param($VMName = '')
 $ErrorActionPreference = 'Stop'
 
 $vmList = @{}
