@@ -1,6 +1,6 @@
 #!/bin/bash
 
 rm -rf .bundle/bash
-rm Gefile.lock
+rm Gemfile.lock
 
 bundle install --path .bundle/bash
