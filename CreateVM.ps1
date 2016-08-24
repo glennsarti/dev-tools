@@ -8,7 +8,7 @@ $Templates = @{
     'ParentDisk' = 'Server 2012 R2 - Master.vhdx'
     'DiskType' = 'vhdx'
     'Memory' = 4096 * 1024 * 1024
-    'VMSwitch' = 'Internal with NAT - Main'
+    'VMSwitch' = 'Internal (with NAT)'
     'Generation' = 2
     'vCPU' = 2
   }
