@@ -46,3 +46,18 @@ $newVM = New-VM -Name $VMName -MemoryStartupBytes $VMTemplate.Memory -Generation
 $newDisk = New-VHD -Path $VMDiskName -ParentPath $RootVMDisk -Differencing
 # Attach the disk
 Add-VMHardDiskDrive -VMName $VMName -Path $VMDiskName | Out-Null
+
+# Start the VM
+Write-Host "Starting the VM..."
+Start-VM -Name $VMName -AsJob | Out-Null
+
+$itsIP = $null
+$attempt = 60
+Write-Host "Waiting $($attempt*2) seconds for IP..."
+do {
+  $ips = Get-VM -Name $VMName | ?{$_.ReplicationMode -ne "Replica"} | Select -ExpandProperty NetworkAdapters | Select IPAddresses
+  $itsIP = $ips.IPAddresses | ? { $_ -like '192.168.200.*' }
+  $attempt--
+  if ($itsIP -eq $null -and $attempt -ne 0) { Start-Sleep -Seconds 2 }
+} until (($attempt -le 0) -or ($itsIP -ne $null))
+Write-Host $itsIP
