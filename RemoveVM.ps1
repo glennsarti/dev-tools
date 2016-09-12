@@ -30,4 +30,10 @@ Write-Host "Removing VM..."
 $vmList.Item($VMName) | Stop-VM -Confirm:$false -Force -TurnOff -Save:$false -ErrorAction 'SilentlyContinue'
 $vmList.Item($VMName) | Remove-VM -Confirm:$false -Force | Out-Null
 Write-Host "Removing Disks..."
-$diskList | Remove-Item -Force -Confirm:$false | Out-Null
+$diskList | % {
+  If (Test-Path -Path $_) {
+    Remove-Item -Force -Confirm:$false | Out-Null
+  } else {
+    Write-Host "Disk at $($_) is already removed "
+  }
+}
