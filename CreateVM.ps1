@@ -12,6 +12,14 @@ $Templates = @{
     'Generation' = 2
     'vCPU' = 2
   }
+  'Server2016RS1' = @{
+    'ParentDisk' = 'Server 2016 RTM - Master.vhdx'
+    'DiskType' = 'vhdx'
+    'Memory' = 4096 * 1024 * 1024
+    'VMSwitch' = 'Internal (with NAT)'
+    'Generation' = 2
+    'vCPU' = 2
+  }
 }
 
 # Get VM Name if not supplied
