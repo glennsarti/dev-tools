@@ -5,7 +5,7 @@ SETLOCAL
 SET /P PROJECT=Enter project name (e.g. puppet): 
 SET /P PRNUM=Enter PR number (e.g. 12345): 
 
-SET REPO=%~dp0%PROJECT%-pr%PRNUM%
+SET REPO=%cd%\%PROJECT%-pr%PRNUM%
 
 ECHO Cleaning...
 RD /S /Q "%REPO%" > NUL
