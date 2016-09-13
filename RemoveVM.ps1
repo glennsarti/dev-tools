@@ -32,7 +32,7 @@ $vmList.Item($VMName) | Remove-VM -Confirm:$false -Force | Out-Null
 Write-Host "Removing Disks..."
 $diskList | % {
   If (Test-Path -Path $_) {
-    Remove-Item -Force -Confirm:$false | Out-Null
+    $_ | Remove-Item -Force -Confirm:$false | Out-Null
   } else {
     Write-Host "Disk at $($_) is already removed "
   }
