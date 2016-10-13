@@ -55,6 +55,10 @@ $newDisk = New-VHD -Path $VMDiskName -ParentPath $RootVMDisk -Differencing
 # Attach the disk
 Add-VMHardDiskDrive -VMName $VMName -Path $VMDiskName | Out-Null
 
+# Set the Boot Order...
+Write-Host "Setting first boot device to Disk..."
+Set-VMFirmware -VMName $VMName -FirstBootDevice (Get-VMHardDiskDrive -VMName $VMName)
+
 # Start the VM
 Write-Host "Starting the VM..."
 Start-VM -Name $VMName -AsJob | Out-Null
