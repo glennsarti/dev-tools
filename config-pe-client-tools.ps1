@@ -108,7 +108,7 @@ Function Invoke-QuickConfig() {
 {
   "puppetdb": {
     "server_urls": "https://$($puppetMaster):8081",
-    "cacert": "$($caCertFile -replace '\\','\\')",
+    "cacert": "$($caCertFile -replace '\\','\\')"
   }
 }
 "@ | Out-File -FilePath (Join-Path -Path $userClientToolsDir -ChildPath 'puppetdb.conf') -Encoding "ASCII"
