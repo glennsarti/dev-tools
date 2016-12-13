@@ -1,4 +1,13 @@
-Param($Template = '', $VMName = '')
+Param(
+  [parameter(Position=0)]
+  [string]$VMName = '',
+
+  [parameter(Position=1)]
+  [string]$Template = '',
+
+  [string]$RemoteUsername = 'Administrator',
+  [string]$RemotePassword = 'Password1'
+)
 $ErrorActionPreference = 'Stop'
 
 $DiskRoot = 'C:\HyperV\Disks'
@@ -20,7 +29,41 @@ $Templates = @{
     'Generation' = 2
     'vCPU' = 2
   }
+  'WindowsContainerHost' = @{
+    'ParentDisk' = 'Server 2016 RTM - Master.vhdx'
+    'DiskType' = 'vhdx'
+    'Memory' = 4096 * 1024 * 1024
+    'VMSwitch' = 'Internal (with NAT)'
+    'Generation' = 2
+    'vCPU' = 2
+    'PostCommands' = @(
+      'Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force',
+      'Install-Module -Name DockerMsftProvider -Repository PSGallery -Force',
+      'Install-Package -Name docker -ProviderName DockerMsftProvider -Force',
+      'Restart-Computer -Force',
+      'docker --version',
+      'docker network create -d transparent TransparentNetworkDHCP',
+      'docker network create -d transparent --subnet=192.168.200.0/24 --gateway=192.168.200.1 TransparentNetwork',
+      'docker pull microsoft/nanoserver',
+      'docker pull microsoft/windowsservercore'
+    )
+  }
 }
+
+# BEGIN Helper Functions
+Function Get-IPFromVMName($VMName, $timeout = 120) {
+  $itsIP = $null
+  $attempt = [int]($timeout / 2)
+  Write-Host "Waiting $($attempt*2) seconds for IP..."
+  do {
+    $ips = Get-VM -Name $VMName | ?{$_.ReplicationMode -ne "Replica"} | Select -ExpandProperty NetworkAdapters | Select IPAddresses
+    $itsIP = $ips.IPAddresses | ? { $_ -like '192.168.200.*' }
+    $attempt--
+    if ($itsIP -eq $null -and $attempt -ne 0) { Start-Sleep -Seconds 2 }
+  } until (($attempt -le 0) -or ($itsIP -ne $null))
+  if ($itsIP -ne $null) { Write-Output $itsIP }
+}
+# END Helper Functions
 
 # Get VM Name if not supplied
 while ($VMName -eq '') {
@@ -37,7 +80,7 @@ while (-not ($Templates.ContainsKey($Template))) {
   $Template = Read-Host -Prompt "Enter Template Name"
 }
 
-$VMTemplate = $Templates."$Template" #"
+$VMTemplate = $Templates."$Template"
 $VMDiskName = Join-Path -Path $DiskRoot -ChildPath "$($VMName).$($VMTemplate.DiskType)"
 $RootVMDisk = Join-Path -Path $DiskRoot -ChildPath "$($VMTemplate.ParentDisk)"
 
@@ -63,13 +106,40 @@ Set-VMFirmware -VMName $VMName -FirstBootDevice (Get-VMHardDiskDrive -VMName $VM
 Write-Host "Starting the VM..."
 Start-VM -Name $VMName -AsJob | Out-Null
 
-$itsIP = $null
-$attempt = 60
-Write-Host "Waiting $($attempt*2) seconds for IP..."
-do {
-  $ips = Get-VM -Name $VMName | ?{$_.ReplicationMode -ne "Replica"} | Select -ExpandProperty NetworkAdapters | Select IPAddresses
-  $itsIP = $ips.IPAddresses | ? { $_ -like '192.168.200.*' }
-  $attempt--
-  if ($itsIP -eq $null -and $attempt -ne 0) { Start-Sleep -Seconds 2 }
-} until (($attempt -le 0) -or ($itsIP -ne $null))
-Write-Host $itsIP
+$vmIP = Get-IPFromVMName -VMName $VMName
+Write-Host $vmIP
+
+# Run any Post Commands if specified
+If ($VMTemplate.PostCommands -ne $null) {
+  $secpasswd = ConvertTo-SecureString $RemotePassword -AsPlainText -Force
+  $winrmCreds = New-Object System.Management.Automation.PSCredential ($RemoteUsername, $secpasswd)
+
+  $VMTemplate.PostCommands | % {
+    # Wait for WinRM to become available (120s timeout)
+    $attempt = 60
+    Write-Host "Waiting $($attempt*2) seconds for WinRM..."
+    do {
+      $isUp = $false
+      try {
+        Test-WSMan -Computer $vmIP -Credential $winrmCreds -Authentication Default | Out-Null
+        $isUp = $true
+     }
+     catch [System.Exception] {
+       $isUp = $false
+     }
+      $attempt--
+      if ((!$isUp) -and $attempt -ne 0) { Start-Sleep -Seconds 2 }
+    } until (($attempt -le 0) -or ($isUp))
+    $cmd = $_
+    Write-Host "Runnning command: $cmd ..."
+    try {
+      Invoke-Command -ComputerName $vmIP -Credential $winrmCreds -ArgumentList @($cmd) -ScriptBlock {
+        param($cmd)
+        Invoke-Expression -Command $cmd
+      }
+    }
+    catch [System.Exception] {
+      Write-Warning "REMOTE ERROR: $_"
+    }
+  }
+}
