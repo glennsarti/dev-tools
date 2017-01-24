@@ -54,10 +54,10 @@ if (-not (Test-Path -Path $devKit2_32)) {
 # URU
 if (-not (Test-Path -Path "$($ENV:ChocolateyInstall)\bin\uru.ps1")) {
   Write-Output "Installing URU..."
-  $downloadURL = 'https://bitbucket.org/jonforums/uru/downloads/uru.0.8.2.nupkg'
+  $downloadURL = 'https://bitbucket.org/jonforums/uru/downloads/uru.0.8.3.nupkg'
   $uruRoot = 'C:\Tools'
   $uruInstall = Join-Path -Path $uruRoot -ChildPath 'URUInstall'
-  $uruInstallNuget = Join-Path -Path $uruInstall -ChildPath 'uru.0.8.1.nupkg'
+  $uruInstallNuget = Join-Path -Path $uruInstall -ChildPath 'uru.0.8.3.nupkg'
   if (Test-Path -Path $uruInstall) { Remove-Item -Path $uruInstall -Force -Recurse -Confirm:$false | Out-Null }
   New-Item -Path $uruInstall -ItemType Directory | Out-Null
   Write-Output "Downloading URU installer..."
