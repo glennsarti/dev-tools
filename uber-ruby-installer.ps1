@@ -145,10 +145,10 @@ $itemsToInstall.GetEnumerator() | % {
   if (-not (Test-Path -Path $destDir)) {
     $tempFile = Join-Path -path $ENV:Temp -ChildPath 'rubydl.7z'
     $tempExtract = Join-Path -path $ENV:Temp -ChildPath 'rubydl_extracted'
-    if (Test-Path -Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Confirm:$false -Force | Out-Null }
+    if (Test-Path -Path $tempExtract) { Start-Sleep -Seconds 2; Remove-Item -Path $tempExtract -Recurse -Confirm:$false -Force | Out-Null }
 
     Write-Host "Downloading from $rubyURL ..."
-    if (Test-Path -Path $tempFile) { Remove-Item -Path $tempFile -Confirm:$false -Force | Out-Null }
+    if (Test-Path -Path $tempFile) { Start-Sleep -Seconds 2; Remove-Item -Path $tempFile -Confirm:$false -Force | Out-Null }
     Invoke-WebRequest -URI $rubyURL -OutFile $tempFile 
 
     & 7z x $tempFile "`"-o$tempExtract`"" -y
