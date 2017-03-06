@@ -37,9 +37,12 @@ $Templates = @{
     'Generation' = 2
     'vCPU' = 2
     'PostCommands' = @(
+      'netsh advfirewall firewall add rule name="All Incoming" dir=in action=allow enable=yes interfacetype=any profile=any localip=any remoteip=any',
+      'netsh advfirewall firewall add rule name="All Outgoing" dir=out action=allow enable=yes interfacetype=any profile=any localip=any remoteip=any',
       'Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force',
       'Install-Module -Name DockerMsftProvider -Repository PSGallery -Force',
       'Install-Package -Name docker -ProviderName DockerMsftProvider -Force',
+      "`"{`n    ```"hosts```": [```"tcp://0.0.0.0:2375```", ```"npipe://```"]`n    ```"insecure-registries```": [```"10.0.0.0/8```"]`n        }`" | Set-Content -Path 'C:\ProgramData\docker\config\daemon.json' -Encoding ASII"
       'Restart-Computer -Force',
       'docker --version',
       'docker network create -d transparent TransparentNetworkDHCP',
@@ -49,6 +52,11 @@ $Templates = @{
     )
   }
 }
+
+# TODO Add portainer to script
+# https://hub.docker.com/r/portainer/portainer/tags/
+# https://portainer.readthedocs.io/en/latest/deployment.html#deployment
+# https://github.com/portainer/portainer/releases
 
 # BEGIN Helper Functions
 Function Get-IPFromVMName($VMName, $timeout = 120) {
