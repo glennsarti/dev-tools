@@ -3,4 +3,4 @@
 echo keeping current bundle...
 rm Gemfile.lock
 
-bundle install --path .bundle/bash
+bundle install --path .bundle/bash "$@"
