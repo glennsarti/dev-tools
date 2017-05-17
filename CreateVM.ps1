@@ -29,6 +29,14 @@ $Templates = @{
     'Generation' = 2
     'vCPU' = 2
   }
+  'Ubuntu1604' = @{
+    'ParentDisk' = 'Ubuntu 16.04 - Master.vhdx'
+    'DiskType' = 'vhdx'
+    'Memory' = 4096 * 1024 * 1024
+    'VMSwitch' = 'Internal (with NAT)'
+    'Generation' = 1
+    'vCPU' = 2
+  }
   'WindowsContainerHost' = @{
     'ParentDisk' = 'Server 2016 RTM - Master.vhdx'
     'DiskType' = 'vhdx'
@@ -81,7 +89,7 @@ while ($VMName -eq '') {
 # Get Template Name if not supplied
 while (-not ($Templates.ContainsKey($Template))) {
   Write-Host "Templates:"
-  $Templates.GetEnumerator() | % {
+  $Templates.GetEnumerator() | Sort-Object Key | % {
     Write-Host " - $($_.Key)"
   }
 
@@ -107,8 +115,10 @@ $newDisk = New-VHD -Path $VMDiskName -ParentPath $RootVMDisk -Differencing
 Add-VMHardDiskDrive -VMName $VMName -Path $VMDiskName | Out-Null
 
 # Set the Boot Order...
-Write-Host "Setting first boot device to Disk..."
-Set-VMFirmware -VMName $VMName -FirstBootDevice (Get-VMHardDiskDrive -VMName $VMName)
+if ($VMTemplate.Generation -eq '2') {
+  Write-Host "Setting first boot device to Disk..."
+  Set-VMFirmware -VMName $VMName -FirstBootDevice (Get-VMHardDiskDrive -VMName $VMName)
+}
 
 # Start the VM
 Write-Host "Starting the VM..."
