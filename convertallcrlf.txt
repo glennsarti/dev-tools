@@ -1,0 +1,1 @@
+gci -Recurse -file | % { [IO.File]::WriteAllText($_, ([IO.File]::ReadAllText($_) -replace "`r`n", "`n")) }
