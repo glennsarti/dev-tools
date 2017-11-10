@@ -128,6 +128,9 @@ if ($VMTemplate.Generation -eq '2') {
   Set-VMFirmware -VMName $VMName -FirstBootDevice (Get-VMHardDiskDrive -VMName $VMName)
 }
 
+# Disable automatic checkpoints
+Set-Vm -Name $VMName -AutomaticCheckpointsEnabled:$false | Out-Null
+
 # Start the VM
 Write-Host "Starting the VM..."
 Start-VM -Name $VMName -AsJob | Out-Null
