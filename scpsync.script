@@ -5,8 +5,8 @@ option batch continue
 mkdir "%3%"
 option batch abort
 
-synchronize remote "%2%" "%3%" -filemask="|.bundle/;.git/;Gemfile.lock"
+synchronize remote "%2%" "%3%" -filemask="|.bundle/;.git/;Gemfile.lock;log/;junit/;*/spec/fixtures/modules/;*/tmp/"
 
-keepuptodate "%2%" "%3%" -nopermissions -filemask="|.bundle/;.git/;Gemfile.lock" -delete
+keepuptodate "%2%" "%3%" -nopermissions -filemask="|.bundle/;.git/;Gemfile.lock;log/;junit/;*/spec/fixtures/modules/;*/tmp/" -delete
 
 exit
