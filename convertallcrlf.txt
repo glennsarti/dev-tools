@@ -1,1 +1,1 @@
-gci -Recurse -file | % { [IO.File]::WriteAllText($_, ([IO.File]::ReadAllText($_) -replace "`r`n", "`n")) }
+gci -Recurse -file | % { $fname = $_.Fullname; Write-Output $fname; [IO.File]::WriteAllText($fname, ([IO.File]::ReadAllText($fname) -replace "`r`n", "`n")) }
