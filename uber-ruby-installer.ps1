@@ -80,7 +80,7 @@ $response.Links | ? { $_.href -match '/ruby-.+-mingw32.7z$'} | % {
 }
 Write-Host "Getting list of available older ruby installs ..."
 $response = Invoke-WebRequest -Uri 'http://rubyinstaller.org/downloads/archives'
-$response.Links | ? { $_.href -match '/ruby-.+-mingw32.7z$'} | % {
+$response.Links | ? { $_.href -match '(/ruby-.+-mingw32.7z$|/rubyinstaller-.+-(x64|x86)\.7z$)'} | % {
   try {
     $rubyVersions.Add( ($_.innerHTML -replace 'Ruby ',''), $_.href )
   } catch {
