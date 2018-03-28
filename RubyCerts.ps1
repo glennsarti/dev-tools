@@ -8,3 +8,4 @@ If (-Not (Test-Path -Path $CACertFile)) {
 
 Write-Output "CA Certificate store set to ${CACertFile}"
 $ENV:SSL_CERT_FILE = $CACertFile
+[System.Environment]::SetEnvironmentVariable('SSL_CERT_FILE',$CACertFile, [System.EnvironmentVariableTarget]::Machine)
