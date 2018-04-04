@@ -75,7 +75,7 @@ if (-not (Test-Path -Path "$($ENV:ChocolateyInstall)\bin\uru.ps1")) {
 $rubyVersions = @{}
 Write-Host "Getting list of available current ruby installs ..."
 $response = Invoke-WebRequest -Uri 'http://rubyinstaller.org/downloads'
-$response.Links | ? { $_.href -match '/ruby-.+-mingw32.7z$'} | % {
+$response.Links | ? { ($_.href -match '/ruby.+-mingw32.7z$') -or ($_.href -match 'rubyinstaller-.+.7z$')} | % {
   $rubyVersions.Add( ($_.innerHTML -replace 'Ruby ',''), $_.href )
 }
 Write-Host "Getting list of available older ruby installs ..."
@@ -152,6 +152,8 @@ $itemsToInstall.GetEnumerator() | % {
 
     Write-Host "Downloading from $rubyURL ..."
     if (Test-Path -Path $tempFile) { Start-Sleep -Seconds 2; Remove-Item -Path $tempFile -Confirm:$false -Force | Out-Null }
+    # Github updated its TLS SSL Settings. Need to twist PowerShell's arm into compliance.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest -URI $rubyURL -OutFile $tempFile 
 
     & 7z x $tempFile "`"-o$tempExtract`"" -y
