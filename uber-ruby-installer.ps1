@@ -1,8 +1,21 @@
-param()
+param(
+  [string]$reqVersion = "",
+  [bool]$useBasicParsing = $true
+)
 
 $ErrorActionPreference = 'Stop'
 
 $is64bit = ([System.IntPtr]::Size -eq 8)
+
+function webReq($url, $tempFile) {
+  if (![string]::IsNullOrEmpty($tempFile) -and ($useBasicParsing -eq $true)) {
+    Invoke-WebRequest -Uri $url -OutFile $tempFile -UseBasicParsing
+  } elseif ($useBasicParsing -eq $true) {
+    Invoke-WebRequest -Uri $url -useBasicParsing
+  } else {
+    Invoke-WebRequest -Uri $url
+  }
+}
 
 function Get-UruTag($rubyVersion) {
   $bareRubyVersion = ($rubyVersion -split ' ')[0]
@@ -10,7 +23,7 @@ function Get-UruTag($rubyVersion) {
   if ($rubyVersion -match 'x64') {
     Write-Output "$($bareRubyVersion)-x64"
   } else {
-    Write-Output "$($bareRubyVersion)-x86"    
+    Write-Output "$($bareRubyVersion)-x86"
   }
 }
 Function Get-DestDir($rubyVersion) {
@@ -74,12 +87,12 @@ if (-not (Test-Path -Path "$($ENV:ChocolateyInstall)\bin\uru.ps1")) {
 # TODO Need a better way to get this.....
 $rubyVersions = @{}
 Write-Host "Getting list of available current ruby installs ..."
-$response = Invoke-WebRequest -Uri 'http://rubyinstaller.org/downloads'
+$response = webReq 'http://rubyinstaller.org/downloads'
 $response.Links | ? { $_.href -match '/ruby-.+-mingw32.7z$'} | % {
   $rubyVersions.Add( ($_.innerHTML -replace 'Ruby ',''), $_.href )
 }
 Write-Host "Getting list of available older ruby installs ..."
-$response = Invoke-WebRequest -Uri 'http://rubyinstaller.org/downloads/archives'
+$response = webReq 'http://rubyinstaller.org/downloads/archives'
 $response.Links | ? { $_.href -match '(/ruby-.+-mingw32.7z$|/rubyinstaller-.+-(x64|x86)\.7z$)'} | % {
   try {
     $rubyVersions.Add( ($_.innerHTML -replace 'Ruby ',''), $_.href )
@@ -91,49 +104,54 @@ $response.Links | ? { $_.href -match '(/ruby-.+-mingw32.7z$|/rubyinstaller-.+-(x
 # Prompt the user for which ruby versions to install
 Write-Host ""
 Write-Host ""
-$itemsToInstall = @{}
-do {
-  $misc = (Read-Host "Would you like to install a single ruby version or a collection? (S or C)").ToUpper()
-} until ( ($misc -eq 'S') -or $misc -eq 'C')
-switch ($misc) {
-  'S' {
-    $orderedList = ($rubyVersions.GetEnumerator() | % { Write-Output $_.Key }| Sort-Object -Descending )
-    do {
-      Write-Host ""
-      Write-Host "Please enter which version to install:"
-      Write-Host ""      $index = 1
-      $orderedList | % {
-        Write-Host "$_"
+if (![string]::IsNullOrEmpty($reqVersion)) {
+  $itemsToInstall = @{$reqVersion = ''}
+} else {
+  $itemsToInstall = @{}
+  do {
+    $misc = (Read-Host "Would you like to install a single ruby version or a collection? (S or C)").ToUpper()
+  } until ( ($misc -eq 'S') -or $misc -eq 'C')
+  switch ($misc) {
+    'S' {
+      $orderedList = ($rubyVersions.GetEnumerator() | % { Write-Output $_.Key }| Sort-Object -Descending )
+      do {
+	Write-Host ""
+	Write-Host "Please enter which version to install:"
+	Write-Host ""      $index = 1
+	$orderedList | % {
+	  Write-Host "$_"
+	}
+	Write-Host ""
+	$version = Read-Host "Enter selection (e.g. 2.3.1 (x64))"
+      } until ( $orderedList -contains $version )
+      $itemsToInstall.Add($version,'')
+    }
+    # Collections are just groups of commonly used ruby versions
+    'C' {
+      do {
+	Write-Host ""
+	Write-Host "Please select which collection to install:"
+	Write-Host ""
+	Write-Host "1. Std. Puppet Collection (2.3.1 (32/64), 2.1.9 (32/64), 2.0.0-x64, 1.9.3)"
+	Write-Host ""
+	$collection = Read-Host "Enter selection (1-1)"
+      } until ( ($collection -eq '1') )
+      switch ($collection) {
+	'1' { $itemsToInstall = @{
+		'2.3.1 (x64)' = '';
+		'2.3.1' = '';
+		'2.1.9 (x64)' = '';
+		'2.1.9' = '';
+		'2.0.0-p648 (x64)' = '';
+		'1.9.3-p551' = '';
+          }
+        }
       }
-      Write-Host ""
-      $version = Read-Host "Enter selection (e.g. 2.3.1 (x64))"
-    } until ( $orderedList -contains $version )
-    $itemsToInstall.Add($version,'')
-  }
-  # Collections are just groups of commonly used ruby versions
-  'C' {
-    do {
-      Write-Host ""
-      Write-Host "Please select which collection to install:"
-      Write-Host ""
-      Write-Host "1. Std. Puppet Collection (2.3.1 (32/64), 2.1.9 (32/64), 2.0.0-x64, 1.9.3)"
-      Write-Host ""
-      $collection = Read-Host "Enter selection (1-1)"
-    } until ( ($collection -eq '1') )
-    switch ($collection) {
-      '1' { $itemsToInstall = @{
-              '2.3.1 (x64)' = '';
-              '2.3.1' = '';
-              '2.1.9 (x64)' = '';
-              '2.1.9' = '';
-              '2.0.0-p648 (x64)' = '';
-              '1.9.3-p551' = '';
-            }
-       }
-    }      
+    }
   }
 }
 
+Write-Output $itemsToInstall	
 # Now we have the names of the rubies, time to install!
 $itemsToInstall.GetEnumerator() | % {
   $rubyVersion = $_.Key
@@ -152,7 +170,8 @@ $itemsToInstall.GetEnumerator() | % {
 
     Write-Host "Downloading from $rubyURL ..."
     if (Test-Path -Path $tempFile) { Start-Sleep -Seconds 2; Remove-Item -Path $tempFile -Confirm:$false -Force | Out-Null }
-    Invoke-WebRequest -URI $rubyURL -OutFile $tempFile 
+
+    webReq $rubyURL $tempFile
 
     & 7z x $tempFile "`"-o$tempExtract`"" -y
 
@@ -207,17 +226,21 @@ $itemsToInstall.GetEnumerator() | % {
   $devkitDir = ''
   if ($rubyVersion -match '^1\.') {
     Write-Output "Installing bundler..."
-    & gem install bundler --no-ri --no-rdoc
-    $devkitDir = $devKit1x    
+    if ([string]::IsNullOrEmpty($reqVersion)) {
+      & gem install bundler --no-ri --no-rdoc
+    }
+    $devkitDir = $devKit1x
   } else {
     Write-Output "Installing bundler..."
-    & gem install bundler --no-ri --no-rdoc --no-document
-    if ($rubyVersion -match 'x64') {
-      $devkitDir = $devKit2_64 
-    } else {
-      $devkitDir = $devKit2_32 
+    if ([string]::IsNullOrEmpty($reqVersion)) {
+      & gem install bundler --no-ri --no-rdoc --no-document
     }
-  } 
+    if ($rubyVersion -match 'x64') {
+      $devkitDir = $devKit2_64
+    } else {
+      $devkitDir = $devKit2_32
+    }
+  }
 
   # Install DevKit ...
 @"
