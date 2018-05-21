@@ -4,155 +4,193 @@ $ErrorActionPreference = 'Stop'
 
 $is64bit = ([System.IntPtr]::Size -eq 8)
 
+if (-not $is64bit) {
+  Throw "Script not supported on 32bit operating systems"; return
+}
+
+# Workaround for https://github.com/majkinetor/au/issues/142
+[System.Net.ServicePointManager]::SecurityProtocol = 3072 -bor
+  768 -bor
+  [System.Net.SecurityProtocolType]::Tls -bor
+  [System.Net.SecurityProtocolType]::Ssl3
+
+$rubyList = @(
+  '2.1.9', '2.1.9 (x64)',
+  '2.4.3-2 (x86)', '2.4.3-2 (x64)'
+)
+$devKit2_64 = 'C:\tools\DevKit2-x64'
+$devKit2_32 = 'C:\tools\DevKit2'
+$msys_64 = 'C:\tools\msys64'
+$msys_32 = 'C:\tools\msys32'
+
 function Get-UruTag($rubyVersion) {
   $bareRubyVersion = ($rubyVersion -split ' ')[0]
 
   if ($rubyVersion -match 'x64') {
     Write-Output "$($bareRubyVersion)-x64"
   } else {
-    Write-Output "$($bareRubyVersion)-x86"    
+    Write-Output "$($bareRubyVersion)-x86"
   }
 }
+
 Function Get-DestDir($rubyVersion) {
   Write-Output ("C:\tools\ruby" + $rubyVersion.Replace(' ','').Replace('(','').Replace(')',''))
 }
 
-# TODO Need to short circuit this if I can...
-choco install 7zip.commandline -y
+# Instal chocolatey if it isn't already here...
+$ChocoExists = $false
+try {
+  Get-Command 'choco.exe' | Out-Null
+  $ChocoExists = $true
+} catch {
+  $ChocoExists = $false
+}
+If (-not $ChocoExists) {
+  Write-Host "Installing Chocolatey..."
+  Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+} else { Write-Host "Chocolatey is installed" -ForegroundColor Green}
 
-$devKit1x = 'C:\tools\devkit'
-$devKit2_64 = 'C:\tools\DevKit2-x64'
-$devKit2_32 = 'C:\tools\DevKit2'
-
-Write-Host "Checking for prerequisite packages..."
-# Install the various ruby devkits
-# Unfortunately devkit installs fail because ruby isn't on the path.
-# Just run choco in a different process and ignore the return code.  Use simple file existence checks to see if it failed
-
-# DevKit for Ruby 1.x
-if (-not (Test-Path -Path $devKit1x)) {
-  Write-Host "Installing DevKit 1.x. NOTE - Errors are expected"
-  Start-Process -FilePath 'choco' -ArgumentList (@('install','ruby.devkit','-y')) -NoNewWindow -Wait | Out-Null
-  if (-not (Test-Path -Path $devKit1x)) { Throw "DevKit 1.x did not install" }
-} else { Write-Host "DevKit 1.x is installed" -ForegroundColor Green }
-
-# DevKit for Ruby 2.x 64bit
-if ($is64bit -and (-not (Test-Path -Path $devKit2_64))) {
-  Write-Host "Installing DevKit 2.x x64. NOTE - Errors are expected"
-  Start-Process -FilePath 'choco' -ArgumentList (@('install','ruby2.devkit','-y')) -NoNewWindow -Wait | Out-Null
-  if (-not (Test-Path -Path $devKit2_32)) { Throw "DevKit 2.x x64 did not install" }
-  Move-Item $devKit2_32 $devKit2_64 -Force -EA Stop
-} else { Write-Host "DevKit 2.x 64bit is installed" -ForegroundColor Green }
-
-# DevKit for Ruby 2.x 32bit
-if (-not (Test-Path -Path $devKit2_32)) {
-  Write-Host "Installing DevKit 2.x x86. NOTE - Errors are expected"
-  Start-Process -FilePath 'choco' -ArgumentList (@('install','ruby2.devkit','-y','-x86','-f')) -NoNewWindow -Wait | Out-Null
-  if (-not (Test-Path -Path $devKit2_32)) { Throw "DevKit 2.x x86 did not install" }
-} else { Write-Host "DevKit 2.x 32bit is installed" -ForegroundColor Green }
+# 7Zip command line
+$7zExists = $false
+try {
+  Get-Command '7z.exe' | Out-Null
+  $7zExists = $true
+} catch {
+  $7zExists = $false
+}
+If (-not $7zExists) {
+  Write-Host "Installing 7Zip command line..."
+  & choco install 7zip.commandline -y
+} else { Write-Host "7Zip is installed" -ForegroundColor Green}
 
 # URU
 if (-not (Test-Path -Path "$($ENV:ChocolateyInstall)\bin\uru.ps1")) {
-  Write-Output "Installing URU..."
-  $downloadURL = 'https://bitbucket.org/jonforums/uru/downloads/uru.0.8.5.nupkg'
+  Write-Host "Installing URU..."
+  Write-Host "Determining the current version of URU..."
+  $uruver = (Invoke-WebRequest 'https://bitbucket.org/jonforums/uru/downloads/uru.json' -UseBasicParsing | ConvertFrom-JSON).version
+  $downloadURL = "https://bitbucket.org/jonforums/uru/downloads/uru.${uruver}.nupkg"
   $uruRoot = 'C:\Tools'
   $uruInstall = Join-Path -Path $uruRoot -ChildPath 'URUInstall'
   $uruInstallNuget = Join-Path -Path $uruInstall -ChildPath 'uru.0.8.5.nupkg'
   if (Test-Path -Path $uruInstall) { Remove-Item -Path $uruInstall -Force -Recurse -Confirm:$false | Out-Null }
   New-Item -Path $uruInstall -ItemType Directory | Out-Null
-  Write-Output "Downloading URU installer..."
+  Write-Host "Downloading URU installer..."
   (New-Object System.Net.WebClient).DownloadFile($downloadURL, $uruInstallNuget)
 
-  Write-Output "Running the URU installer..."
+  Write-Host "Running the URU installer..."
   choco install uru -source $uruInstall -f -y
 
   # Cleaning up...
   if (Test-Path -Path $uruInstall) { Remove-Item -Path $uruInstall -Force -Recurse -Confirm:$false | Out-Null }
 } else { Write-Host "Uru is installed" -ForegroundColor Green}
 
-# Get the list of available ruby versions to install?
-# TODO Need a better way to get this.....
-$rubyVersions = @{}
-Write-Host "Getting list of available current ruby installs ..."
-$response = Invoke-WebRequest -Uri 'http://rubyinstaller.org/downloads'
-$response.Links | ? { $_.href -match '/ruby-.+-mingw32.7z$'} | % {
-  $rubyVersions.Add( ($_.innerHTML -replace 'Ruby ',''), $_.href )
-}
-Write-Host "Getting list of available older ruby installs ..."
-$response = Invoke-WebRequest -Uri 'http://rubyinstaller.org/downloads/archives'
-$response.Links | ? { $_.href -match '(/ruby-.+-mingw32.7z$|/rubyinstaller-.+-(x64|x86)\.7z$)'} | % {
-  try {
-    $rubyVersions.Add( ($_.innerHTML -replace 'Ruby ',''), $_.href )
-  } catch {
-    # Ignore all errors
+# Prompt the user for which ruby versions to install
+$itemsToInstall = @()
+do {
+  Write-Host ""
+  Write-Host ""
+  Write-Host "A. Install all versions ('$($rubyList -join "', '")')"
+  For($index = 0; $index -lt $rubyList.Count; $index++) {
+    Write-Host "$([char]($index + 66)). Install '$($rubyList[$index])'"
+  }
+  Write-Host "----"
+  Write-Host "Z. Install custom version"
+  Write-Host ""
+  $misc = (Read-Host "Select an option").ToUpper()
+} until ( ($misc -ge 'A') -and $misc -le 'Z')
+
+$option = ([int][char]$misc - 65)
+switch ($option) {
+  0 {
+    $itemsToInstall = $rubyList
+    break;
+  }
+  25 {
+    # Ask the user for the version string
+    do {
+      $misc = ''
+      Write-Host ""
+      Write-Host "Note, the version must match one on the Ruby Installer archive website"
+      Write-Host "  https://rubyinstaller.org/downloads/archives/"
+      $misc = (Read-Host "Enter Ruby version to install (e.g. '2.4.3-2 (x64)')")
+    } until ($misc -ne '')
+    $itemsToInstall = @($misc)
+  }
+  default {
+    $itemsToInstall = @($rubyList[$option - 1])
   }
 }
 
-# Prompt the user for which ruby versions to install
-Write-Host ""
-Write-Host ""
-$itemsToInstall = @{}
-do {
-  $misc = (Read-Host "Would you like to install a single ruby version or a collection? (S or C)").ToUpper()
-} until ( ($misc -eq 'S') -or $misc -eq 'C')
-switch ($misc) {
-  'S' {
-    $orderedList = ($rubyVersions.GetEnumerator() | % { Write-Output $_.Key }| Sort-Object -Descending )
-    do {
-      Write-Host ""
-      Write-Host "Please enter which version to install:"
-      Write-Host ""      $index = 1
-      $orderedList | % {
-        Write-Host "$_"
-      }
-      Write-Host ""
-      $version = Read-Host "Enter selection (e.g. 2.3.1 (x64))"
-    } until ( $orderedList -contains $version )
-    $itemsToInstall.Add($version,'')
-  }
-  # Collections are just groups of commonly used ruby versions
-  'C' {
-    do {
-      Write-Host ""
-      Write-Host "Please select which collection to install:"
-      Write-Host ""
-      Write-Host "1. Std. Puppet Collection (2.3.1 (32/64), 2.1.9 (32/64), 2.0.0-x64, 1.9.3)"
-      Write-Host ""
-      $collection = Read-Host "Enter selection (1-1)"
-    } until ( ($collection -eq '1') )
-    switch ($collection) {
-      '1' { $itemsToInstall = @{
-              '2.3.1 (x64)' = '';
-              '2.3.1' = '';
-              '2.1.9 (x64)' = '';
-              '2.1.9' = '';
-              '2.0.0-p648 (x64)' = '';
-              '1.9.3-p551' = '';
-            }
-       }
-    }      
-  }
-}
+if ( ($itemsToInstall -join '') -eq '' ) { Throw "Nothing to install!!"; return; }
 
 # Now we have the names of the rubies, time to install!
-$itemsToInstall.GetEnumerator() | % {
-  $rubyVersion = $_.Key
-  $rubyURL = $_.Value
-  if ($rubyURL -eq '') {
-    $rubyURL = $rubyVersions[$rubyVersion]
+$itemsToInstall | % {
+  $rubyVersionString = $_
+  Write-Host "Installing Ruby ${rubyVersionString} ..."
+
+  $rubyIs64 = $rubyVersionString -match 'x64'
+  $rubyVersionString -match '^([\d.-]+)' | Out-Null
+  $rubyVersion = $matches[1]
+
+  $rubyURL = $null
+  $32bitDevKit = $false
+  $64bitDevKit = $false
+  $RIDKDevKit = $false
+  $destDir = Get-DestDir($rubyVersionString)
+  $uruTag = Get-UruTag($rubyVersionString)
+
+  # URL base page
+  # https://rubyinstaller.org/downloads/archives/
+  switch -Regex ($rubyVersion) {
+    '^2\.[0123]\.' {
+      # Example URL
+      # 32bit 'https://dl.bintray.com/oneclick/rubyinstaller/ruby-2.3.3-i386-mingw32.7z'
+      # 64bit 'https://dl.bintray.com/oneclick/rubyinstaller/ruby-2.3.3-x64-mingw32.7z'
+      if ($rubyIs64) {
+        $rubyURL = "https://dl.bintray.com/oneclick/rubyinstaller/ruby-${rubyVersion}-x64-mingw32.7z"
+        $64bitDevKit = $true
+      } else {
+        $rubyURL = "https://dl.bintray.com/oneclick/rubyinstaller/ruby-${rubyVersion}-i386-mingw32.7z"
+        $32bitDevKit = $true
+      }
+    }
+    '^2\.4\.1\-' {
+      # Example URL
+      # 2.4.1 only
+      # 32bit 'https://github.com/oneclick/rubyinstaller2/releases/download/2.4.1-2/rubyinstaller-2.4.1-2-x86.7z'
+      # 64bit 'https://github.com/oneclick/rubyinstaller2/releases/download/2.4.1-2/rubyinstaller-2.4.1-2-x64.7z'
+      if ($rubyIs64) {
+        $rubyURL = "https://github.com/oneclick/rubyinstaller2/releases/download/${rubyVersion}/rubyinstaller-${rubyVersion}-x64.7z"
+      } else {
+        $rubyURL = "https://github.com/oneclick/rubyinstaller2/releases/download/${rubyVersion}/rubyinstaller-${rubyVersion}-x86.7z"
+      }
+      $RIDKDevKit = $true
+    }
+
+    '^2\.[56789]\.|^2\.4\.[23456789]-' {
+      # Example URL
+      # 2.4.2+ and 2.5+ only
+      # 32bit 'https://github.com/oneclick/rubyinstaller2/releases/download/rubyinstaller-2.5.1-1/rubyinstaller-2.5.1-1-x86.7z'
+      # 64bit 'https://github.com/oneclick/rubyinstaller2/releases/download/rubyinstaller-2.5.1-1/rubyinstaller-2.5.1-1-x64.7z'
+      if ($rubyIs64) {
+        $rubyURL = "https://github.com/oneclick/rubyinstaller2/releases/download/rubyinstaller-${rubyVersion}/rubyinstaller-${rubyVersion}-x64.7z"
+      } else {
+        $rubyURL = "https://github.com/oneclick/rubyinstaller2/releases/download/rubyinstaller-${rubyVersion}/rubyinstaller-${rubyVersion}-x86.7z"
+      }
+      $RIDKDevKit = $true
+    }
+    default { Throw "Unknown Ruby Version $rubyVersion"; return }
   }
 
-  Write-Host "Installing Ruby $($rubyVersion) from $($rubyURL)"
-  $destDir = Get-DestDir($rubyVersion)
-
+  # Install the ruby files
   if (-not (Test-Path -Path $destDir)) {
     $tempFile = Join-Path -path $ENV:Temp -ChildPath 'rubydl.7z'
-    $tempExtract = Join-Path -path $ENV:Temp -ChildPath 'rubydl_extracted'
+    $tempExtract = Join-Path -path $ENV:Temp -ChildPath ('rubydl_extracted' + [guid]::NewGuid().ToString())
     if (Test-Path -Path $tempExtract) { Start-Sleep -Seconds 2; Remove-Item -Path $tempExtract -Recurse -Confirm:$false -Force | Out-Null }
 
     Write-Host "Downloading from $rubyURL ..."
     if (Test-Path -Path $tempFile) { Start-Sleep -Seconds 2; Remove-Item -Path $tempFile -Confirm:$false -Force | Out-Null }
-    Invoke-WebRequest -URI $rubyURL -OutFile $tempFile 
+    Invoke-WebRequest -URI $rubyURL -OutFile $tempFile -UseBasicParsing
 
     & 7z x $tempFile "`"-o$tempExtract`"" -y
 
@@ -163,28 +201,22 @@ $itemsToInstall.GetEnumerator() | % {
     if (Test-Path -Path $destDir) { Remove-Item -Path $destDir -Recurse -Confirm:$false -Force | Out-Null }
     Move-Item -Path $misc -Destination $destDir -Force -Confirm:$false | Out-Null
 
+    Write-Host "Adding to URU..."
+    & uru admin add "$($destDir)\bin" --tag $uruTag
+
     Write-Host "Cleaning up..."
     if (Test-Path -Path $tempFile) { Remove-Item -Path $tempFile -Confirm:$false -Force | Out-Null }
     if (Test-Path -Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Confirm:$false -Force | Out-Null }
-  } else { Write-Host "Ruby is already installed to $destDir"}
+  } else { Write-Host "Ruby ${rubyVersionString} is already installed to $destDir"}
 
-  Write-Host "Adding to URU..."
-  & uru admin add "$($destDir)\bin" --tag $(Get-UruTag $rubyVersion)
-
-}
-
-# Now configure each ruby...
-$itemsToInstall.GetEnumerator() | % {
-  $rubyVersion = $_.Key
-  Write-Host "------ Configuring $rubyVersion ..."
-
-  & uru $(Get-UruTag $rubyVersion)
+  # Configure the ruby installation
+  & uru $uruTag
   Write-Output "Ruby version..."
   & ruby -v
   Write-Output "Gem version..."
   & gem -v
 
-  # Create temporary gemrc for http
+  # Update the system gems
   $tempRC =  Join-Path -path $ENV:Temp -ChildPath 'gem.rc'
 @"
 ---
@@ -204,30 +236,86 @@ $itemsToInstall.GetEnumerator() | % {
   }
   Remove-Item -Path $tempRC -Force -Confirm:$false | Out-Null
 
-  $devkitDir = ''
-  if ($rubyVersion -match '^1\.') {
-    Write-Output "Installing bundler..."
-    & gem install bundler --no-ri --no-rdoc
-    $devkitDir = $devKit1x    
-  } else {
-    Write-Output "Installing bundler..."
-    & gem install bundler --no-ri --no-rdoc --no-document
-    if ($rubyVersion -match 'x64') {
-      $devkitDir = $devKit2_64 
+  # Install bundler if it's not already there
+  $BundleExists = $false
+  try {
+    Get-Command 'bundle' | Out-Null
+    $BundleExists = $true
+  } catch {
+    $BundleExists = $false
+  }
+  if (-not $BundleExists) {
+    Write-Host "Installing bundler..."
+    if ($rubyVersion -match '^1\.') {
+      & gem install bundler --no-ri --no-rdoc
     } else {
-      $devkitDir = $devKit2_32 
+      & gem install bundler --no-ri --no-rdoc --no-document --force
     }
-  } 
+  } else { Write-Host "Bundler already installed" -ForegroundColor Green }
 
-  # Install DevKit ...
+  # MSYS2 dev kit (Ruby 2.4+)
+  if ($RIDKDevKit) {
+    if ($rubyIs64) {
+      # DevKit for Ruby 2.4+ 64bit
+      if (-not (Test-Path -Path $msys_64)) {
+        Write-Host "Installing DevKit 2.4+ x64"
+        Start-Process -FilePath 'choco' -ArgumentList (@('install','msys2','-y','--params','/NoUpdate')) -NoNewWindow -Wait | Out-Null
+      } else { Write-Host "DevKit 2.4+ 64bit is installed" -ForegroundColor Green }
+    } else {
+      # DevKit for Ruby 2.4+ 32bit
+      if (-not (Test-Path -Path $msys_32)) {
+        Write-Host "Installing DevKit 2.4+ x86"
+        Start-Process -FilePath 'choco' -ArgumentList (@('install','msys2','-y','-x86','-f','--params','/NoUpdate')) -NoNewWindow -Wait | Out-Null
+      } else { Write-Host "DevKit 2.4+ 32bit is installed" -ForegroundColor Green }
+    }
+
+    & ridk install 2 3
+  }
+
+  # 64 and 32 bit legacy DevKit
+  if ($64bitDevKit -or $32bitDevKit) {
+    #******************
+    # ORDER IS VERY IMPORTANT - 64bit Devkit MUST be installed before 32bit
+    #******************
+    # DevKit for Ruby 2.x 64bit
+    if ($is64bit -and (-not (Test-Path -Path $devKit2_64))) {
+      Write-Host "Installing DevKit 2.x x64. NOTE - Errors are expected"
+      Start-Process -FilePath 'choco' -ArgumentList (@('install','ruby2.devkit','-y')) -NoNewWindow -Wait | Out-Null
+      if (-not (Test-Path -Path $devKit2_32)) { Throw "DevKit 2.x x64 did not install" }
+      Move-Item $devKit2_32 $devKit2_64 -Force -EA Stop
+    } else { Write-Host "DevKit 2.x 64bit is installed" -ForegroundColor Green }
+
+    # DevKit for Ruby 2.x 32bit
+    if (-not (Test-Path -Path $devKit2_32)) {
+      Write-Host "Installing DevKit 2.x x86. NOTE - Errors are expected"
+      Start-Process -FilePath 'choco' -ArgumentList (@('install','ruby2.devkit','-y','-x86','-f')) -NoNewWindow -Wait | Out-Null
+      if (-not (Test-Path -Path $devKit2_32)) { Throw "DevKit 2.x x86 did not install" }
+    } else { Write-Host "DevKit 2.x 32bit is installed" -ForegroundColor Green }
+
+    # 64bit legacy devkit
+    if ($64bitDevKit) {
 @"
 ---
-- $( (Get-DestDir($rubyVersion)) -replace '\\','/' )
-"@ | Set-Content -Path "$($devkitDir)\config.yml"
-  Push-Location $devkitDir
-  Write-Host "Installing DevKit $devKit for $rubyVersion"
-  & ruby dk.rb install
-  Pop-Location
+- $( $destDir -replace '\\','/' )
+"@ | Set-Content -Path "$($devKit2_64)\config.yml"
+      Push-Location $devKit2_64
+      Write-Host "Installing DevKit $devKit2_64 for $rubyVersion"
+      & ruby dk.rb install
+      Pop-Location
+    }
+
+  # 32bit legacy devkit
+    if ($32bitDevKit) {
+@"
+---
+- $( $destDir -replace '\\','/' )
+"@ | Set-Content -Path "$($devKit2_32)\config.yml"
+      Push-Location $devKit2_32
+      Write-Host "Installing DevKit $devKit2_32 for $rubyVersion"
+      & ruby dk.rb install
+      Pop-Location
+    }
+  }
 }
 
 Write-Host "Cleanup URU assignment"
