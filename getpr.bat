@@ -2,9 +2,17 @@
 
 SETLOCAL
 
+SET /P OWNER=Enter project owner (default - puppetlabs):
 SET /P PROJECT=Enter project name (e.g. puppet):
-SET /P BRANCH=Enter branch name (e.g. master):
+SET /P BRANCH=Enter branch name (default - master):
 SET /P PRNUM=Enter PR number (e.g. 12345):
+
+if [%OWNER%] == [] (
+  SET BRANCH=puppetlabs
+)
+if [%BRANCH%] == [] (
+  SET BRANCH=master
+)
 
 SET REPO=%cd%\%PROJECT%-pr%PRNUM%
 
@@ -12,7 +20,7 @@ ECHO Cleaning...
 RD /S /Q "%REPO%" > NUL
 
 ECHO Cloning..
-git clone https://github.com/puppetlabs/%PROJECT%.git "%REPO%"
+git clone https://github.com/%OWNER%/%PROJECT%.git "%REPO%"
 
 PUSHD "%REPO%"
 
