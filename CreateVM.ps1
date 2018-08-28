@@ -45,6 +45,14 @@ $Templates = @{
     'Generation' = 1
     'vCPU' = 2
   }
+  'Ubuntu1804Desktop' = @{
+    'ParentDisk' = 'Ubuntu 18.04 Desktop - Master.vhdx'
+    'DiskType' = 'vhdx'
+    'Memory' = 4096 * 1024 * 1024
+    'VMSwitch' = 'Internal (with NAT)'
+    'Generation' = 1
+    'vCPU' = 2
+  }
   'WindowsContainerHost' = @{
     'ParentDisk' = 'Server 2016 RTM - Master.vhdx'
     'DiskType' = 'vhdx'
