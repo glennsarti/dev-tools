@@ -1,1 +1,1 @@
-Get-NetConnectionProfile | ? { $_.NetworkCategory -eq 'Public' } | SetNetConnectionProfile -NetworkCategory Private
+Get-NetConnectionProfile | ? { $_.NetworkCategory -eq 'Public' } | Set-NetConnectionProfile -NetworkCategory Private

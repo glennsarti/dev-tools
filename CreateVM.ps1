@@ -52,6 +52,7 @@ $Templates = @{
     'VMSwitch' = 'Internal (with NAT)'
     'Generation' = 1
     'vCPU' = 2
+    'EnhancedSessionTransportType' = 'HvSocket'
   }
   'WindowsContainerHost' = @{
     'ParentDisk' = 'Server 2016 RTM - Master.vhdx'
@@ -138,6 +139,11 @@ if ($VMTemplate.Generation -eq '2') {
 
 # Disable automatic checkpoints
 Set-Vm -Name $VMName -AutomaticCheckpointsEnabled:$false | Out-Null
+
+# Set Session type
+if ($VMTemplate.EnhancedSessionTransportType -ne $null) {
+  Set-VM -Name $VMName -EnhancedSessionTransportType $VMTemplate.EnhancedSessionTransportType
+}
 
 # Start the VM
 Write-Host "Starting the VM..."

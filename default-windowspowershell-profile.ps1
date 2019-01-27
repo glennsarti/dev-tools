@@ -12,5 +12,6 @@ if ($Install) {
 
 If ($ENV:ConEmuHWND -eq $null) {
   Import-Module PSConsoleTheme
-  Set-ConsoleTheme 'Solarized Dark'
+  Set-ConsoleTheme 'Bright'
+  Set-Location C:\Source
 }
