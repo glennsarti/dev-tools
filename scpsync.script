@@ -5,8 +5,8 @@ option batch continue
 mkdir "%3%"
 option batch abort
 
-synchronize remote "%2%" "%3%" -filemask="|.bundle/;.git/;Gemfile.lock;log/;junit/;*/spec/fixtures/modules/;*/tmp/"
+synchronize remote "%2%" "%3%" -filemask="|.bundle/;.git/;Gemfile.lock;log/;junit/;*/spec/fixtures/modules/;*/tmp/;*/.vscode-test;*/vscode;*/node_modules"
 
-keepuptodate "%2%" "%3%" -nopermissions -filemask="|.bundle/;.git/;Gemfile.lock;log/;junit/;*/spec/fixtures/modules/;*/tmp/" -delete
+keepuptodate "%2%" "%3%" -nopermissions -filemask="|.bundle/;.git/;Gemfile.lock;log/;junit/;*/spec/fixtures/modules/;*/tmp/;*/.vscode-test;*/vscode;*/node_modules" -delete
 
 exit

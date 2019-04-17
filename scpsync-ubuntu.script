@@ -1,0 +1,13 @@
+
+# open sftp://administrator:Qu%40lity%21@%1% -hostkey="*"
+open sftp://root@%1% -hostkey="*" "-privatekey=C:\Users\glenn.sarti\.ssh\id_vmpooler.ppk"
+
+option batch continue
+mkdir "/project"
+option batch abort
+
+synchronize remote "%2%" "/project" -filemask="|.bundle/;.git/;Gemfile.lock;log/;junit/;*/spec/fixtures/modules/;*/tmp/;*/.vscode-test/;*/.vscode/;*/node_modules/"
+
+keepuptodate "%2%" "/project" -nopermissions -filemask="|.bundle/;.git/;Gemfile.lock;log/;junit/;*/spec/fixtures/modules/;*/tmp/;*/.vscode-test/;*/.vscode/;*/node_modules/" -delete
+
+exit
