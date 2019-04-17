@@ -10,7 +10,7 @@ if ($Install) {
   }
 }
 
-If ($ENV:ConEmuHWND -eq $null) {
+If (($null -eq $ENV:ConEmuHWND) -and ($ENV:TERM_PROGRAM -ne 'vscode')) {
   Import-Module PSConsoleTheme
   Set-ConsoleTheme 'Bright'
   Set-Location C:\Source
