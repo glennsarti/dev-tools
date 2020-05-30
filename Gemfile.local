@@ -12,4 +12,8 @@ else
 #  gem 'ruby-debug'
 end
 
-gem "pry-stack_explorer"
+if RUBY_VERSION =~ /^2\.[6789]/
+  gem "pry-stack_explorer"
+else
+  gem "pry-stack_explorer", "~>0.4.0"
+end
