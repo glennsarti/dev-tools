@@ -10,6 +10,8 @@ if ($Install) {
   } else {
     "`n. `"$PSCommandPath`"" | Out-File $ProfileFile -Encoding UTF8 -Append -Force -Confirm:$false
   }
+
+  Install-Module Posh-Git
   return
 }
 
@@ -20,3 +22,4 @@ If (($null -eq $ENV:ConEmuHWND) -and ($ENV:TERM_PROGRAM -ne 'vscode')) {
 }
 
 Import-Module Posh-Git
+$ENV:Path = $ENV:Path + ";$PSScriptRoot"
