@@ -2,6 +2,8 @@ param([Switch]$Install)
 
 if ($Install) {
   $ProfileFile = $PROFILE # Join-Path -Path ([environment]::getfolderpath("mydocuments")) -ChildPath 'WindowsPowerShell\Profile.ps1'
+  $ProfilePath = Split-Path $ProfileFile -Parent
+  if (-not (Test-Path -Path $ProfilePath)) { New-Item -Path $ProfilePath -ItemType Directory -Force -Confirm:$false | Out-Null }
 
   if (-not (Test-Path -Path $ProfileFile)) {
     ". `"$PSCommandPath`"" | Set-Content $ProfileFile -Encoding UTF8 -Force -Confirm:$false
