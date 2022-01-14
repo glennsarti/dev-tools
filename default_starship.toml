@@ -1,0 +1,63 @@
+format ="""
+${env_var.is_elevated_session}$username@$hostname $git_branch$git_commit$git_state$git_status
+$directory$ruby$rust$golang$dotnet"""
+
+# Inserts a blank line between shell prompts
+add_newline = true
+
+# LINE ONE
+
+[env_var.is_elevated_session] # TODO: Turn this into a custom env_var once implemented
+variable = "ISELEVATEDSESSION"
+symbol   = '⚡'
+format   = "[$symbol](bold bright-yellow)"
+
+[username]
+format = "[$user](bg:black)"
+disabled = false
+show_always = true
+
+[hostname]
+ssh_only = false
+format   = "$hostname"
+
+## Virtual Working Environment:
+##TODO: virtual env: vagrant, docker
+
+[git_branch]
+symbol = " -> "
+always_show_remote = true
+format = "on [$branch$symbol$remote_name/$remote_branch]($style) "
+
+[git_commit]
+tag_disabled = false
+
+[git_state]
+# No overrides
+
+[git_status]
+# Show the info relative to the upstream first: how many commits ahead/behind/diverged/conflicted
+# Show the info for current working set after: deleted, staged, renamed, modified, untracked.
+format       = "$ahead$behind$diverged$conflicted$deleted$staged$renamed$modified$untracked"
+conflicted   = "[≠$count ](bold purple)"
+ahead        = "[⇡$count ](bold purple)"
+behind       = "[⇣$count ](bold purple)"
+diverged     = "[⇕$count ](bold purple)"
+untracked    = "[+$count ](bold blue)"
+modified     = "[~$count ](bold cyan)"
+staged       = "[++$count ](bold green)"
+renamed      = "[»$count ](bold white)"
+deleted      = "[✘$count ](bold red)"
+
+# LINE TWO
+[character]
+success_symbol = "[ ✓](bold bg:black fg:green)"
+error_symbol   = "[ ✗](bold bg:black fg:bright-purple)"
+
+[directory]
+truncation_length = 3
+truncate_to_repo = false
+read_only = "🧾"
+format = "[$read_only$path > ](fg:cyan)"
+
+## Languages:
