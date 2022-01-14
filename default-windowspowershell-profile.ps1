@@ -1,14 +1,19 @@
 param([Switch]$Install)
 
 $BinRoot = Join-Path $PSScriptRoot 'bin'
+  if (-not (Test-Path -Path $BinRoot)) { New-Item -Path $BinRoot -ItemType Directory -Force -Confirm:$false | Out-Null }
 
 if ($Install) {
   $ProfileFile = $PROFILE
   $ProfilePath = Split-Path $ProfileFile -Parent
   if (-not (Test-Path -Path $ProfilePath)) { New-Item -Path $ProfilePath -ItemType Directory -Force -Confirm:$false | Out-Null }
 
-  Write-Host "Installing Posh-git..."
-  Install-Module Posh-Git
+  $PGit = Get-Module -All | Where-Object { $_.Name -eq 'posh-git' } | Measure-Object
+
+  if ($PGit -eq 0) {
+    Write-Host "Installing Posh-git..."
+    Install-Module Posh-Git
+  }
 
   Write-Host "Copying StarShip profile..."
   $StarShipDir = "~/.config"
@@ -59,8 +64,7 @@ if ($Install) {
     if ($Suffix -eq '.zip') {
       Expand-Archive -Path $TempFile -DestinationPath $BinRoot
     } else {
-      Write-Host "I don't know how to process $Suffix files!"
-      return
+      & tar -xvf $TempFile '--directory' $BinRoot
     }
   }
 

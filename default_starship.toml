@@ -1,9 +1,12 @@
 format ="""
 ${env_var.is_elevated_session}$username@$hostname $git_branch$git_commit$git_state$git_status
-$directory$ruby$rust$golang$dotnet"""
+$ruby$rust$golang$dotnet$directory"""
 
 # Inserts a blank line between shell prompts
 add_newline = true
+
+# Make it a tad faster than 500
+command_timeout = 1500
 
 # LINE ONE
 
