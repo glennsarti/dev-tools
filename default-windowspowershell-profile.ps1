@@ -121,7 +121,7 @@ If (Test-Administrator) {
 }
 
 Import-Module Posh-Git
-$ENV:Path = $ENV:Path + ";$PSScriptRoot"
+$ENV:PATH = $ENV:PATH + [IO.Path]::PathSeparator + $PSScriptRoot
 
 # Turn on starship! 🚀🚀🚀
 $StarshipExe = Join-Path $BinRoot 'starship'
