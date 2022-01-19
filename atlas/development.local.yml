@@ -1,0 +1,35 @@
+archivist:
+  internal_url: <%= ENV["ARCHIVIST_INTERNAL_URL"] %>
+
+queue_manager:
+  base_url: <%= ENV["QUEUE_MANAGER_BASE_URL"] %>
+
+billing:
+  base_url: <%= ENV["BILLING_BASE_URL"] %>
+
+vcs:
+  base_url: <%= ENV["VCS_BASE_URL"] %>
+
+nomad:
+  base_url: <%= ENV["NOMAD_BASE_URL"] %>
+
+isolation_nomad:
+  base_url: <%= ENV["ISOLATION_NOMAD_BASE_URL"] %>
+
+redis:
+  url: <%= ENV["REDIS_URL"] %>
+
+redis_cache:
+  url: <%= ENV["REDIS_CACHE_URL"] || ENV["REDIS_URL"] %>
+
+registry:
+  base_url: <%= ENV["REGISTRY_BASE_URL"] %>
+
+terraform_state_parser:
+  base_url: <%= ENV["TERRAFORM_STATE_PARSER_BASE_URL"] %>
+
+slugingress:
+  base_url: <%= ENV["SLUGINGRESS_BASE_URL"] %>
+
+vault:
+  address: <%= ENV["VAULT_ADDR"] %>

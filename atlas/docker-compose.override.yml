@@ -1,0 +1,51 @@
+version: "3.3"
+
+services:
+  atlas:
+    # command: tail -f /dev/null
+    # Run a simple TCP forwarder to the host instance
+    command: /bin/sh -c "apk add socat && socat TCP-LISTEN:3000,fork TCP:host.docker.internal:3000"
+    environment:
+      SKIP_EMBER: "true"
+    volumes:
+      - type: bind
+        source: ./tmp/ember-cli
+        target: /app/tmp/ember-cli
+
+  registry:
+    ports:
+      - "23121:3121"
+
+  terraform-state-parser:
+    ports:
+      - "27588:7588"
+
+  slug-ingress:
+    ports:
+      - "27586:7586"
+
+  tf-vcs:
+    ports:
+      - "27678:7678"
+
+  tfe-queue-manager:
+    ports:
+      - "27676:7676"
+
+  tf-cloud-billing:
+    ports:
+      - "27677:7677"
+
+  archivist:
+    ports:
+      - "27675:7675"
+
+  rabbitmq:
+    ports:
+      - "25672:5672"
+
+  redis-cache:
+    ports:
+      - "26380:6379"
+
+
