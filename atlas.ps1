@@ -2,6 +2,13 @@ param([Switch]$Force, [Switch]$Setup)
 
 $CurrentDir = (Get-Location).Path
 
+if (-Not (Test-Path (Join-Path $CurrentDir 'frontend/atlas'))) {
+  Write-Host "-------------------------------------------" -Foreground Red
+  Write-Host "I don't think you're in an Atlas repository" -Foreground Red
+  Write-Host "-------------------------------------------" -Foreground Red
+  Exit 1
+}
+
 if ($Setup.IsPresent) {
   @{
     'docker-compose.override.yml' = 'docker-compose.override.yml'
@@ -35,10 +42,6 @@ if ($Setup.IsPresent) {
   }
   return
 }
-
-
-throw "!!!"
-
 
 Write-Host "Inspect tfe_local_atlas container..." -Foreground Yellow
 $AtlasContainer = (& docker inspect tfe_local_atlas) | ConvertFrom-JSON -AsHash

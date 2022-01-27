@@ -3,6 +3,7 @@ version: "3.3"
 services:
   runtask-service:
     image: ruby:2.7.4
+    container_name: "tfe_local_runtask_service"
     networks:
       default:
         aliases: [runtask.tfe.zone]
