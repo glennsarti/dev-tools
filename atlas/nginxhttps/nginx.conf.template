@@ -1,0 +1,54 @@
+user nginx;
+worker_processes auto;
+pid /var/run/nginx.pid;
+
+events {
+  worker_connections 768;
+}
+
+http {
+  sendfile on;
+  tcp_nopush on;
+  tcp_nodelay on;
+  keepalive_timeout 65;
+  types_hash_max_size 2048;
+  include /etc/nginx/mime.types;
+  default_type application/octet-stream;
+
+  access_log /var/log/nginx/access.log;
+  error_log /var/log/nginx/error.log;
+
+  gzip on;
+  gzip_disable "msie6";
+
+  proxy_read_timeout 600s;
+  proxy_send_timeout 600s;
+
+  satisfy any;
+
+  real_ip_header X-Forwarded-For;
+
+  allow all;
+
+  auth_basic "TFE Local";
+  auth_basic_user_file /etc/nginx/htpasswd;
+
+  server {
+    listen 443 default_server ssl;
+
+    ssl_certificate /etc/nginx/atlas-selfsigned.crt;
+    ssl_certificate_key /etc/nginx/atlas-selfsigned.key;
+
+    proxy_buffering off;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+
+    client_max_body_size 0;
+
+    location / {
+      proxy_pass http://local.tfe.zone:80;
+    }
+  }
+}

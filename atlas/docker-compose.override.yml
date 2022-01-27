@@ -1,7 +1,47 @@
 version: "3.3"
 
 services:
+  runtask-service:
+    image: ruby:2.7.4
+    networks:
+      default:
+        aliases: [runtask.tfe.zone]
+      tfcdev:
+        aliases: [runtask.tfe.zone]
+    command: ruby /tmp/server.rb
+    ports:
+      - "28080:8080"
+    volumes:
+      - "./tmp/local-runtask/server.rb:/tmp/server.rb:ro"
+    restart: "always"
+
+  nginx-https:
+    image: quay.io/hashicorp/hc-atlas-nginx:1.0.0
+    container_name: "tfe_local_nginx_https"
+    depends_on:
+      - nginx
+    entrypoint: >-
+      sh /tmp/entrypoint.sh
+    environment:
+      TFE_FQDN: "${TFE_FQDN}"
+      TFLOCAL_CLOUD: "${TFLOCAL_CLOUD:-}"
+    networks:
+      default:
+        aliases: [localhttps.tfe.zone]
+      tfcdev:
+        aliases: [localhttps.tfe.zone]
+    ports:
+      - "443:443"
+    volumes:
+      - "./tmp/local-nginxhttps/atlas-selfsigned.crt:/etc/nginx/atlas-selfsigned.crt:ro"
+      - "./tmp/local-nginxhttps/atlas-selfsigned.key:/etc/nginx/atlas-selfsigned.key:ro"
+      - "./docker/nginx/entrypoint.sh:/tmp/entrypoint.sh:ro"
+      - "./docker/nginx/htpasswd:/etc/nginx/htpasswd:ro"
+      - "./tmp/local-nginxhttps/nginx.conf.template:/tmp/nginx.conf.template:ro"
+    restart: "always"
+
   atlas:
+    # Keep the container alive
     # command: tail -f /dev/null
     # Run a simple TCP forwarder to the host instance
     command: /bin/sh -c "apk add socat && socat TCP-LISTEN:3000,fork TCP:host.docker.internal:3000"
@@ -48,4 +88,8 @@ services:
     ports:
       - "26380:6379"
 
-
+  outbound-http-proxy:
+    # Allows http://host.docker.internal:8080 style addresses for the Run Task
+    command: ./outbound-http-proxy --config-file config.yaml --allow-range 192.168.0.0/16 --allow-range 172.16.0.0/12
+    ports:
+      - "28888:8888"

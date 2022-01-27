@@ -33,3 +33,10 @@ slugingress:
 
 vault:
   address: <%= ENV["VAULT_ADDR"] %>
+
+http_proxy:
+  host: <%= ENV["OUTBOUND_HTTP_PROXY_HOST"] %>
+  port: <%= ENV["OUTBOUND_HTTP_PROXY_PORT"] %>
+
+datadog:
+  enabled: false

@@ -1,8 +1,53 @@
-param([Switch]$Force)
+param([Switch]$Force, [Switch]$Setup)
+
+$CurrentDir = (Get-Location).Path
+
+if ($Setup.IsPresent) {
+  @{
+    'docker-compose.override.yml' = 'docker-compose.override.yml'
+    'application.rb' = 'config/application.rb'
+    'development.local.yml' = 'docker/terraform-enterprise/development.local.yml'
+
+    'nginxhttps/atlas-selfsigned.crt' = 'tmp/local-nginxhttps/atlas-selfsigned.crt'
+    'nginxhttps/atlas-selfsigned.key' = 'tmp/local-nginxhttps/atlas-selfsigned.key'
+    'nginxhttps/nginx.conf.template' = 'tmp/local-nginxhttps/nginx.conf.template'
+
+    'runtask-service/server.rb' = 'tmp/local-runtask/server.rb'
+  }.GetEnumerator() | ForEach-Object {
+    $LocalFilePath = $_.Key
+    $DestFilePath = $_.Value
+
+    $LocalFilePath = Join-Path (Join-Path $PSScriptRoot 'atlas') $LocalFilePath
+    $LocalFile = Get-ChildItem -Path $LocalFilePath
+
+    $DestFilePath = Join-Path $CurrentDir $DestFilePath
+    $DestFile = $null
+    if (Test-Path $DestFilePath) { $DestFile = Get-ChildItem -Path $DestFilePath }
+
+    if (($null -eq $DestFile) -or ($DestFile.Length -ne $LocalFile.Length)) {
+      Write-Host "Updating $DestFilePath ..." -Foreground Magenta
+
+      $Parent = Split-Path $DestFilePath -Parent
+      if (-Not (Test-Path $Parent)) { New-Item -Path $parent -ItemType Directory | Out-Null }
+
+      Copy-Item -Path $LocalFilePath -Destination $DestFilePath -Force -Confirm:$false | Out-Null
+    }
+  }
+  return
+}
+
+
+throw "!!!"
+
 
 Write-Host "Inspect tfe_local_atlas container..." -Foreground Yellow
 $AtlasContainer = (& docker inspect tfe_local_atlas) | ConvertFrom-JSON -AsHash
 $AtlasContainerId = $AtlasContainer.Id
+
+if (-not $AtlasContainer['State']['Running']) {
+  Write-Host "Atlas Container is not running" -Foreground Red
+  Exit 1
+}
 
 if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Global:AtlasCachedEnvVar) -or $Force.IsPresent) {
   $EnvVars = @{}
@@ -21,6 +66,8 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
   $EnvVars['TERRAFORM_STATE_PARSER_BASE_URL'] = 'http://tsp.tfe:7588'
   $EnvVars['VAULT_ADDR'] = 'http://vault.tfe:8200'
   $EnvVars['VCS_BASE_URL'] = 'http://vcs.tfe:7678'
+  $EnvVars['OUTBOUND_HTTP_PROXY_HOST'] = "http-proxy.service.consul"
+  $EnvVars['OUTBOUND_HTTP_PROXY_PORT'] = "http-proxy.service.consul"
 
   # Extract the Atlas Container env vars...
   $AtlasContainer['Config']['Env'] | ForEach-Object {
@@ -34,11 +81,9 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
       '(RUBY_.+|BUNDLE_.+|GEM_.+)' { break }
       'SSH_AUTH_SOCK' { break }
       Default {
-        #Write-Host "Using $EnvVal..."
         $EnvVars[$EnvName] = $EnvVal
       }
     }
-
   }
 
   # Find all the networking information...
@@ -76,7 +121,7 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
       if ($null -eq $ContNetwork) {
         Write-Host "$($ContInfo.Name) is not on the same network as Atlas" -Foreground Yellow
       } else {
-        $ContNetwork.Aliases | ForEach-Object {
+        $ContNetwork.Aliases | Where-Object { $_ -ne ''} | ForEach-Object {
           Write-Host "Found network alias of $_" -Foreground Yellow
           $NetworkAliases[$_] = "localhost:$portBinding"
         }
@@ -97,7 +142,11 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
     $NewValue = $EnvValue
     $NetworkAliasKeys | ForEach-Object {
       $Text = [Regex]::Escape($_)
-      $NewValue = $NewValue -replace "($Text`:[\d]+|$Text(?!:\/\/))", $NetworkAliases[$_]
+      $ReplaceText = $NetworkAliases[$_]
+      if ($EnvName -like '*_HOST') { $ReplaceText = ($NetworkAliases[$_] -split ':')[0] }
+      if ($EnvName -like '*_PORT') { $ReplaceText = ($NetworkAliases[$_] -split ':')[1] }
+
+      $NewValue = $NewValue -replace "($Text`:[\d]+|$Text(?!:\/\/))", $ReplaceText
     }
 
     if ($NewValue -ne $EnvValue) {
@@ -116,8 +165,7 @@ $Global:AtlasCachedEnvVar.GetEnumerator() | % {
   Set-Item -Path "Env:$($_.Key)" -Value $_.Value
 }
 
-Write-Host "Atlas is configured!" -Foreground Green
-
+# bundle exec rails server --binding 0.0.0.0 --port 3000
 $RunArgs = @('bundle', 'exec', 'rails', 'server', '--binding', '0.0.0.0', '--port', '3000')
 if ($args.length -gt 0) {
   $RunArgs = $args
