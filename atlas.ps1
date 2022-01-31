@@ -12,8 +12,6 @@ if (-Not (Test-Path (Join-Path $CurrentDir 'frontend/atlas'))) {
 if ($Setup.IsPresent) {
   @{
     'docker-compose.override.yml' = 'docker-compose.override.yml'
-    'application.rb' = 'config/application.rb'
-    'development.local.yml' = 'docker/terraform-enterprise/development.local.yml'
 
     'nginxhttps/atlas-selfsigned.crt' = 'tmp/local-nginxhttps/atlas-selfsigned.crt'
     'nginxhttps/atlas-selfsigned.key' = 'tmp/local-nginxhttps/atlas-selfsigned.key'
@@ -93,6 +91,7 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
   # Default alias for localhost
   $NetworkAliases = [ordered]@{
     'host.docker.internal' = 'localhost'
+    'tfcdev-8a904ffb.au.ngrok.io' = '192.168.100.149'
   }
 
   $NetworkName = $AtlasContainer['HostConfig']['NetworkMode']
@@ -125,8 +124,12 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
         Write-Host "$($ContInfo.Name) is not on the same network as Atlas" -Foreground Yellow
       } else {
         $ContNetwork.Aliases | Where-Object { $_ -ne ''} | ForEach-Object {
-          Write-Host "Found network alias of $_" -Foreground Yellow
-          $NetworkAliases[$_] = "localhost:$portBinding"
+          if ($_ -ne 'ngrok') {
+            Write-Host "Found network alias of $_" -Foreground Yellow
+            $NetworkAliases[$_] = "localhost:$portBinding"
+          } else {
+            Write-Host "Ignoring network alias of $_"
+          }
         }
       }
     } else {
@@ -163,10 +166,13 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
 }
 
 # Set the Environment
+$DotEnv = Join-Path $CurrentDir '.env'
+$Content = ""
 $Global:AtlasCachedEnvVar.GetEnumerator() | % {
   Write-Verbose "Setting $($_.Key) = $($_.Value)"
-  Set-Item -Path "Env:$($_.Key)" -Value $_.Value
+  $Content += "$($_.Key)=$($_.Value)`n"
 }
+$Content | Out-File -Path $DotEnv -Encoding 'utf8' -Force -Confirm:$false
 
 # bundle exec rails server --binding 0.0.0.0 --port 3000
 $RunArgs = @('bundle', 'exec', 'rails', 'server', '--binding', '0.0.0.0', '--port', '3000')
@@ -174,5 +180,5 @@ if ($args.length -gt 0) {
   $RunArgs = $args
 }
 
-$Cmd, $OtherArgs = $RunArgs
-& $Cmd @OtherArgs
+$DotEnvWrapper = Join-Path $PSScriptRoot 'atlas/dotenv.rb'
+& ruby $DotEnvWrapper @RunArgs
