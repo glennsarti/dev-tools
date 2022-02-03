@@ -78,7 +78,6 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
 
   # Pre-populate needed ENV vars for Atlas config
   # The network aliases will be substituted later
-  $EnvVars['ARCHIVIST_INTERNAL_URL'] = 'http://archivist.tfe:7675'
   $EnvVars['BILLING_BASE_URL'] = 'http://billing.tfe'
   $EnvVars['ISOLATION_NOMAD_BASE_URL'] = 'http://nomad.tfe:4646'
   $EnvVars['NOMAD_BASE_URL'] = 'http://nomad.tfe:4646'
@@ -168,21 +167,30 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
     $EnvName = $_
     $EnvValue = $EnvVars[$EnvName]
 
-    $NewValue = $EnvValue
-    $NetworkAliasKeys | ForEach-Object {
-      $Text = [Regex]::Escape($_)
-      $ReplaceText = $NetworkAliases[$_]
-      if ($EnvName -like '*_HOST') { $ReplaceText = ($NetworkAliases[$_] -split ':')[0] }
-      if ($EnvName -like '*_PORT') { $ReplaceText = ($NetworkAliases[$_] -split ':')[1] }
+    switch ($EnvName) {
+      #'ARCHIVIST_INTERNAL_URL' { Write-Host "Can't munge " }
+      Default {
+        $NewValue = $EnvValue
+        $NetworkAliasKeys | ForEach-Object {
+          $Text = [Regex]::Escape($_)
+          $ReplaceText = $NetworkAliases[$_]
+          if ($EnvName -like '*_HOST') { $ReplaceText = ($NetworkAliases[$_] -split ':')[0] }
+          if ($EnvName -like '*_PORT') { $ReplaceText = ($NetworkAliases[$_] -split ':')[1] }
 
-      $NewValue = $NewValue -replace "($Text`:[\d]+|$Text(?!:\/\/))", $ReplaceText
-    }
+          $NewValue = $NewValue -replace "($Text`:[\d]+|$Text(?!:\/\/))", $ReplaceText
+        }
 
-    if ($NewValue -ne $EnvValue) {
-      Write-host "Munging $EnvValue to $NewValue in $EnvName" -Foreground Yellow
-      $EnvVars[$EnvName] = $NewValue
+        if ($NewValue -ne $EnvValue) {
+          Write-host "Munging $EnvValue to $NewValue in $EnvName" -Foreground Yellow
+          $EnvVars[$EnvName] = $NewValue
+        }
+      }
     }
   }
+  # The internal URL is used inside the compose stack so we can't munge it, and the URL must be accessible
+  # from inside the stack AND from atlas running outside the stack. So use the internet for it 😢
+  $EnvVars['ARCHIVIST_INTERNAL_URL'] = "https://$AtlasHostName/_archivist"
+  Write-host "Munging ARCHIVIST_INTERNAL_URL to $($EnvVars['ARCHIVIST_INTERNAL_URL'])" -Foreground Yellow
 
   $Global:AtlasCachedEnvVar = $EnvVars
   $Global:AtlasCachedContainerId = $AtlasContainerId
