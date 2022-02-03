@@ -36,8 +36,8 @@ http {
   server {
     listen 443 default_server ssl;
 
-    ssl_certificate /etc/nginx/atlas-selfsigned.crt;
-    ssl_certificate_key /etc/nginx/atlas-selfsigned.key;
+    ssl_certificate /etc/nginx/ssl/atlas.crt;
+    ssl_certificate_key /etc/nginx/ssl/atlas.key;
 
     proxy_buffering off;
     proxy_set_header Host $host;

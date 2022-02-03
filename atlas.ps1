@@ -1,4 +1,7 @@
+[CmdletBinding(SupportsShouldProcess=$true)]
 param([Switch]$Force, [Switch]$Setup)
+
+$ErrorActionPreference = 'Stop'
 
 $CurrentDir = (Get-Location).Path
 
@@ -10,12 +13,25 @@ if (-Not (Test-Path (Join-Path $CurrentDir 'frontend/atlas'))) {
 }
 
 if ($Setup.IsPresent) {
+  $CAKey = Join-Path (Join-Path $PSScriptRoot 'atlas') 'internal-ca.pem'
+  if (-Not (Test-Path $CAKey)) {
+    Write-Host "Creating Internal CA Private Key..." -Foreground Green
+    & openssl genrsa -out $CAKey 4096
+  }
+  $CAFile = Join-Path (Join-Path $PSScriptRoot 'atlas') 'internal-ca.crt'
+  if (-Not (Test-Path $CAFile)) {
+    Write-Host "Creating Internal CA Certificate..." -Foreground Green
+    & openssl req -x509 -sha256 -new -nodes -key $CAKey -days 3650 -out $CAFile -subj "/C=AU/ST=WA/L=Perth/O=HashiCorp/CN=internal-ca"
+  }
+
   @{
     'docker-compose.override.yml' = 'docker-compose.override.yml'
 
-    'nginxhttps/atlas-selfsigned.crt' = 'tmp/local-nginxhttps/atlas-selfsigned.crt'
-    'nginxhttps/atlas-selfsigned.key' = 'tmp/local-nginxhttps/atlas-selfsigned.key'
+    'nginxhttps/https_entrypoint.sh' = 'tmp/local-nginxhttps/https_entrypoint.sh'
+    'nginxhttps/emptyfile' = 'tmp/local-nginxhttps/ssl/emptyfile'
     'nginxhttps/nginx.conf.template' = 'tmp/local-nginxhttps/nginx.conf.template'
+    'internal-ca.pem' = 'tmp/local-nginxhttps/internal-ca.pem'
+    'internal-ca.crt' = 'tmp/local-nginxhttps/internal-ca.crt'
 
     'runtask-service/server.rb' = 'tmp/local-runtask/server.rb'
   }.GetEnumerator() | ForEach-Object {
@@ -53,6 +69,13 @@ if (-not $AtlasContainer['State']['Running']) {
 if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Global:AtlasCachedEnvVar) -or $Force.IsPresent) {
   $EnvVars = @{}
 
+  $AtlasHostName = $AtlasContainer.Config.Env | Where-Object { $_.StartsWith('TFE_FQDN=') } | Select -First 1 | ForEach-Object { Write-Output ($_ -split '=',2)[1] }
+  if ([String]::IsNullOrEmpty($AtlasHostName)) {
+    Write-Host "Could not determin the Atlas hostname from the container environment variables" -Foreground Red
+    exit 1
+  }
+  Write-Verbose "Atlas is using Hostname $AtlasHostName"
+
   # Pre-populate needed ENV vars for Atlas config
   # The network aliases will be substituted later
   $EnvVars['ARCHIVIST_INTERNAL_URL'] = 'http://archivist.tfe:7675'
@@ -67,8 +90,8 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
   $EnvVars['TERRAFORM_STATE_PARSER_BASE_URL'] = 'http://tsp.tfe:7588'
   $EnvVars['VAULT_ADDR'] = 'http://vault.tfe:8200'
   $EnvVars['VCS_BASE_URL'] = 'http://vcs.tfe:7678'
-  $EnvVars['OUTBOUND_HTTP_PROXY_HOST'] = "http-proxy.service.consul"
-  $EnvVars['OUTBOUND_HTTP_PROXY_PORT'] = "http-proxy.service.consul"
+  $EnvVars['OUTBOUND_HTTP_PROXY_HOST'] = "outbound-http-proxy"
+  $EnvVars['OUTBOUND_HTTP_PROXY_PORT'] = "outbound-http-proxy"
 
   # Extract the Atlas Container env vars...
   $AtlasContainer['Config']['Env'] | ForEach-Object {
@@ -91,7 +114,6 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
   # Default alias for localhost
   $NetworkAliases = [ordered]@{
     'host.docker.internal' = 'localhost'
-    'tfcdev-8a904ffb.au.ngrok.io' = '192.168.100.149'
   }
 
   $NetworkName = $AtlasContainer['HostConfig']['NetworkMode']
@@ -124,7 +146,8 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
         Write-Host "$($ContInfo.Name) is not on the same network as Atlas" -Foreground Yellow
       } else {
         $ContNetwork.Aliases | Where-Object { $_ -ne ''} | ForEach-Object {
-          if ($_ -ne 'ngrok') {
+          # We only care about aliases that kinda sorta look like DNS names.
+          if (($_ -like '*.*') -and ($_ -ne $AtlasHostName)) {
             Write-Host "Found network alias of $_" -Foreground Yellow
             $NetworkAliases[$_] = "localhost:$portBinding"
           } else {
@@ -163,6 +186,8 @@ if (($Global:AtlasCachedContainerId -ne $AtlasContainerId) -or ($null -eq $Globa
 
   $Global:AtlasCachedEnvVar = $EnvVars
   $Global:AtlasCachedContainerId = $AtlasContainerId
+  $global:AtlasCachedFQDN = $AtlasHostName
+  $Global:AtlasCachedHostIP = & ifconfig -l | xargs -n1 ipconfig getifaddr
 }
 
 # Set the Environment
@@ -181,4 +206,10 @@ if ($args.length -gt 0) {
 }
 
 $DotEnvWrapper = Join-Path $PSScriptRoot 'atlas/dotenv.rb'
-& ruby $DotEnvWrapper @RunArgs
+Write-Host "------------------------" -Foreground Green
+Write-Host "Remember to set $($global:AtlasCachedFQDN) to $($Global:AtlasCachedHostIP) in hosts file" -Foreground Green
+Write-Host "------------------------" -Foreground Green
+
+If ($PSCmdlet.ShouldProcess("Console", "Run Ruby with; $RunArgs")){
+  & ruby $DotEnvWrapper @RunArgs
+}

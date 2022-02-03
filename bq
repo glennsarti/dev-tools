@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo keeping current bundle...
-rm Gemfile.lock
+#rm Gemfile.lock
 
-bundle install --path .bundle/bash "$@"
+bundle config set --local path .bundle/bash
+PATH="/opt/homebrew/opt/libpq/bin:$PATH" bundle install "$@"
