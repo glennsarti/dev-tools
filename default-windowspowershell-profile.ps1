@@ -8,9 +8,9 @@ if ($Install) {
   $ProfilePath = Split-Path $ProfileFile -Parent
   if (-not (Test-Path -Path $ProfilePath)) { New-Item -Path $ProfilePath -ItemType Directory -Force -Confirm:$false | Out-Null }
 
-  $PGit = Get-Module -All | Where-Object { $_.Name -eq 'posh-git' } | Measure-Object
+  $PGit = Get-Module -ListAvailable | Where-Object { $_.Name -eq 'posh-git' } | Measure-Object
 
-  if ($PGit -eq 0) {
+  if ($PGit.Count -eq 0) {
     Write-Host "Installing Posh-git..."
     Install-Module Posh-Git
   }
@@ -39,6 +39,10 @@ if ($Install) {
       if ($PSVersionTable.OS -like '*Darwin*' -and $PSVersionTable.OS -like '*ARM64*') {
         $ArchName = 'aarch64'
         $OSName = 'apple-darwin'
+        $Suffix = ".tar.gz"
+      } else {
+        $ArchName = 'x86_64'
+        $OSName = 'unknown-linux'
         $Suffix = ".tar.gz"
       }
     }
